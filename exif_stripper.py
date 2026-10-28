@@ -115,22 +115,27 @@ def _list_images(path: str) -> list[str]:
     return found
 
 
+def _is_multi_input(args: argparse.Namespace) -> bool:
+    return os.path.isdir(args.input) and bool(args.batch)
+
+
 def _resolve_output(args: argparse.Namespace, src: str, input_root: str | None) -> str | None:
     if args.in_place:
         return None
-    if args.output is not None and (
-        os.path.isdir(args.output) or _is_multi_input(args)
-    ):
+    if args.output is None:
+        return None
+
+    # A directory-style output: an existing directory, a --batch folder run,
+    # or a path with no file extension (looks like a directory).
+    _, ext = os.path.splitext(args.output)
+    looks_like_dir = (
+        os.path.isdir(args.output) or _is_multi_input(args) or ext == ""
+    )
+    if looks_like_dir:
         rel = os.path.relpath(src, input_root) if input_root else os.path.basename(src)
-        root, ext = os.path.splitext(rel)
-        return os.path.join(args.output, f"{root}_stripped{ext}")
-    if args.output is not None:
-        return args.output
-    return None
-
-
-def _is_multi_input(args: argparse.Namespace) -> bool:
-    return os.path.isdir(args.input) and bool(args.batch)
+        root, rext = os.path.splitext(rel)
+        return os.path.join(args.output, f"{root}_stripped{rext}")
+    return args.output
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -158,6 +163,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Process every image inside a directory",
     )
     args = parser.parse_args(argv)
+
+    if args.preview and args.in_place:
+        print(
+            "error: --preview and --in-place don't combine; preview is read-only",
+            file=sys.stderr,
+        )
+        return 2
 
     if not os.path.exists(args.input):
         print(f"error: not found: {args.input}", file=sys.stderr)
@@ -198,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"   {len(meta)} metadata field(s) would be removed:")
                     for key, value in meta.items():
                         print(f"   - {key}: {value}")
+                print("   (preview mode: no files were modified)")
             else:
                 out = _resolve_output(args, src, input_root)
                 if out is not None:

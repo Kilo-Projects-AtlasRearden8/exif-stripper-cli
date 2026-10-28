@@ -137,7 +137,48 @@ def test_report_exported(tmp_path):
     assert data["files"][0]["gps_removed"] is True
 
 
-def test_directory_without_batch_errors(tmp_path):
+def _make_png(path, with_gps=False):
+    img = Image.new("RGBA", (60, 60), color=(0, 128, 64, 255))
+    exif = Image.Exif()
+    exif[0x010F] = "PngMake"
+    if with_gps:
+        gps = exif.get_ifd(exif_stripper.GPS_IFD_TAG)
+        gps[0x0001] = "N"
+        gps[0x0002] = (12.0, 30.0, 0.0)
+    img.save(path, exif=exif)
+    return path
+
+
+def test_strip_png_removes_exif(tmp_path):
+    src = tmp_path / "src.png"
+    dst = tmp_path / "dst.png"
+    _make_png(src, with_gps=True)
+    entry = exif_stripper.strip_image(str(src), str(dst))
+    assert entry["format"] == "PNG"
+    assert entry["gps_removed"] is True
+    assert entry["removed_tags"]["Make"] == "PngMake"
+    with Image.open(dst) as img:
+        assert not img.getexif()
+
+
+def test_preview_and_in_place_conflict(tmp_path):
+    src = tmp_path / "x.jpg"
+    _make_image(src)
+    code = exif_stripper.main(["--preview", "--in-place", str(src)])
+    assert code == 2
+
+
+def test_output_as_directory_for_single_file(tmp_path):
+    src = tmp_path / "pic.jpg"
+    _make_image(src)
+    outdir = tmp_path / "cleaned"
+    code = exif_stripper.main(["-o", str(outdir), str(src)])
+    assert code == 0
+    assert (outdir / "pic_stripped.jpg").exists()
+    with Image.open(outdir / "pic_stripped.jpg") as img:
+        assert not img.getexif()
+
+
     _make_image(tmp_path / "a.jpg")
     code = exif_stripper.main([str(tmp_path)])
     assert code == 2
