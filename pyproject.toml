@@ -1,0 +1,18 @@
+[project]
+name = "exif-stripper"
+version = "1.0.0"
+description = "Locally strip EXIF and GPS metadata from photos, with preview, batch mode, and JSON reports."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = ["Pillow>=10.0.0"]
+
+[project.scripts]
+exif-stripper = "exif_stripper:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["exif_stripper"]
